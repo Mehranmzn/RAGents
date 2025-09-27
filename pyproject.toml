@@ -1,6 +1,6 @@
 [project]
 name = "RAGents"
-version = "0.1.2"
+version = "0.1.3"
 description = "Production-ready agentic RAG framework featuring intelligent decision trees, Logic-LLM integration, multimodal processing, and enterprise observability"
 readme = "README.md"
 requires-python = ">=3.10"
