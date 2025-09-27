@@ -77,7 +77,7 @@
   
   <!-- Text -->
   <text x="200" y="310" font-family="Arial, sans-serif" font-size="42" font-weight="bold" text-anchor="middle" fill="#1a1f3a">
-    REGENTS
+    RAGents
   </text>
   <text x="200" y="340" font-family="Arial, sans-serif" font-size="18" font-weight="300" text-anchor="middle" fill="#4a69bd">
     RAG Framework
