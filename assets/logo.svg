@@ -1,0 +1,89 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="200" cy="200" r="180" fill="#1a1f3a" opacity="0.1"/>
+  
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a69bd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e3799;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f39c12;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e67e22;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Crown Symbol (representing Regents) -->
+  <g transform="translate(200, 120)">
+    <!-- Crown Base -->
+    <path d="M -60 30 L -60 50 L 60 50 L 60 30 Z" fill="url(#primaryGradient)" filter="url(#shadow)"/>
+    
+    <!-- Crown Points -->
+    <path d="M -60 30 L -45 -20 L -30 10 L -15 -30 L 0 10 L 15 -30 L 30 10 L 45 -20 L 60 30 Z" 
+          fill="url(#primaryGradient)" filter="url(#shadow)"/>
+    
+    <!-- Crown Jewels -->
+    <circle cx="0" cy="-10" r="8" fill="url(#accentGradient)"/>
+    <circle cx="-30" cy="5" r="5" fill="#f39c12"/>
+    <circle cx="30" cy="5" r="5" fill="#f39c12"/>
+  </g>
+  
+  <!-- Database/Knowledge Symbol (RAG retrieval) -->
+  <g transform="translate(140, 220)">
+    <ellipse cx="0" cy="0" rx="35" ry="12" fill="#34495e" opacity="0.9"/>
+    <rect x="-35" y="0" width="70" height="40" fill="#34495e" opacity="0.9"/>
+    <ellipse cx="0" cy="40" rx="35" ry="12" fill="#34495e" opacity="0.9"/>
+    <ellipse cx="0" cy="20" rx="35" ry="12" fill="none" stroke="#2c3e50" stroke-width="2"/>
+    <ellipse cx="0" cy="0" rx="35" ry="12" fill="none" stroke="#2c3e50" stroke-width="2"/>
+  </g>
+  
+  <!-- Neural Network Nodes (AI/Generation) -->
+  <g transform="translate(260, 220)">
+    <!-- Connections -->
+    <line x1="0" y1="0" x2="30" y2="15" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="0" x2="30" y2="35" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="20" x2="30" y2="15" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="20" x2="30" y2="35" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="40" x2="30" y2="15" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="40" x2="30" y2="35" stroke="#4a69bd" stroke-width="2" opacity="0.6"/>
+    
+    <!-- Nodes -->
+    <circle cx="0" cy="0" r="6" fill="url(#primaryGradient)"/>
+    <circle cx="0" cy="20" r="6" fill="url(#primaryGradient)"/>
+    <circle cx="0" cy="40" r="6" fill="url(#primaryGradient)"/>
+    <circle cx="30" cy="15" r="6" fill="url(#accentGradient)"/>
+    <circle cx="30" cy="35" r="6" fill="url(#accentGradient)"/>
+  </g>
+  
+  <!-- Connecting Arrow (Retrieval to Generation) -->
+  <g transform="translate(200, 235)">
+    <path d="M -25 0 L 15 0" stroke="#4a69bd" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M 10 -5 L 20 0 L 10 5" fill="#4a69bd"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="200" y="310" font-family="Arial, sans-serif" font-size="42" font-weight="bold" text-anchor="middle" fill="#1a1f3a">
+    REGENTS
+  </text>
+  <text x="200" y="340" font-family="Arial, sans-serif" font-size="18" font-weight="300" text-anchor="middle" fill="#4a69bd">
+    RAG Framework
+  </text>
+  
+  <!-- Decorative Lines -->
+  <line x1="80" y1="355" x2="140" y2="355" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+  <line x1="260" y1="355" x2="320" y2="355" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+</svg>

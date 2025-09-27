@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAGents Transparency Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: calc(100vh - 120px);
+        }
+
+        .chat-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .visualization-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus, .input-group textarea:focus, .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.connected {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status.disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            height: calc(100% - 80px);
+            overflow-y: auto;
+        }
+
+        .tree-visualization {
+            height: 300px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .events-log {
+            height: calc(100% - 340px);
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .event-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .event-item.tool-execution {
+            border-left-color: #10b981;
+        }
+
+        .event-item.error {
+            border-left-color: #ef4444;
+        }
+
+        .event-item.reasoning-step {
+            border-left-color: #f59e0b;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .event-type {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .event-time {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .event-data {
+            background: white;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .data-renderer {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .data-renderer h4 {
+            margin-bottom: 10px;
+            color: #374151;
+        }
+
+        .table-renderer {
+            overflow-x: auto;
+        }
+
+        .table-renderer table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .table-renderer th,
+        .table-renderer td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .table-renderer th {
+            background: #f8fafc;
+            font-weight: 600;
+        }
+
+        .cards-renderer {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .card h5 {
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .key-value-renderer {
+            display: grid;
+            gap: 8px;
+        }
+
+        .key-value-pair {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            padding: 8px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+
+        .key {
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .value {
+            color: #374151;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            color: #6b7280;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 RAGents Transparency Dashboard</h1>
+        <p>Real-time visualization of agent reasoning and decision making</p>
+    </div>
+
+    <div class="main-container">
+        <div class="chat-panel">
+            <div id="chat-interface"></div>
+        </div>
+
+        <div class="visualization-panel">
+            <div id="visualization-area"></div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        // Chat Interface Component
+        function ChatInterface() {
+            const [sessionId, setSessionId] = React.useState('');
+            const [message, setMessage] = React.useState('');
+            const [agentType, setAgentType] = React.useState('decision_tree');
+            const [isLoading, setIsLoading] = React.useState(false);
+
+            const sendMessage = async () => {
+                if (!message.trim() || isLoading) return;
+
+                setIsLoading(true);
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message,
+                            agent_type: agentType,
+                            session_id: sessionId || undefined
+                        })
+                    });
+
+                    const result = await response.json();
+                    setSessionId(result.session_id);
+                    setMessage('');
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    sendMessage();
+                }
+            };
+
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <h2 style={{ marginBottom: '20px', color: '#374151' }}>Chat Interface</h2>
+
+                    <div className="input-group">
+                        <label>Session ID</label>
+                        <input
+                            type="text"
+                            value={sessionId}
+                            onChange={(e) => setSessionId(e.target.value)}
+                            placeholder="Auto-generated or enter custom ID"
+                        />
+                    </div>
+
+                    <div className="input-group">
+                        <label>Agent Type</label>
+                        <select
+                            value={agentType}
+                            onChange={(e) => setAgentType(e.target.value)}
+                        >
+                            <option value="decision_tree">Decision Tree</option>
+                            <option value="graph_planner">Graph Planner</option>
+                            <option value="react">ReAct Agent</option>
+                        </select>
+                    </div>
+
+                    <div className="input-group" style={{ flex: 1 }}>
+                        <label>Message (Ctrl+Enter to send)</label>
+                        <textarea
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder="Ask the agent something..."
+                            rows={6}
+                            style={{ resize: 'none', height: '150px' }}
+                        />
+                    </div>
+
+                    <button
+                        className="btn"
+                        onClick={sendMessage}
+                        disabled={isLoading || !message.trim()}
+                    >
+                        {isLoading ? 'Processing...' : 'Send Message'}
+                    </button>
+
+                    <div style={{ marginTop: '20px', fontSize: '14px', color: '#6b7280' }}>
+                        💡 Tips: Try asking about complex topics to see the agent's reasoning process in action
+                    </div>
+                </div>
+            );
+        }
+
+        // Visualization Area Component
+        function VisualizationArea() {
+            const [activeTab, setActiveTab] = React.useState('events');
+            const [events, setEvents] = React.useState([]);
+            const [isConnected, setIsConnected] = React.useState(false);
+            const [sessionId, setSessionId] = React.useState('');
+
+            React.useEffect(() => {
+                // Try to get session ID from URL or use the first available session
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlSessionId = urlParams.get('session');
+                if (urlSessionId) {
+                    setSessionId(urlSessionId);
+                }
+            }, []);
+
+            React.useEffect(() => {
+                if (sessionId) {
+                    const eventSource = new EventSource(`/events/${sessionId}`);
+
+                    eventSource.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        setEvents(prev => [...prev, data]);
+                    };
+
+                    eventSource.onopen = () => setIsConnected(true);
+                    eventSource.onerror = () => setIsConnected(false);
+
+                    return () => {
+                        eventSource.close();
+                        setIsConnected(false);
+                    };
+                }
+            }, [sessionId]);
+
+            const clearEvents = () => {
+                setEvents([]);
+            };
+
+            const tabs = [
+                { id: 'events', label: 'Events Log' },
+                { id: 'tree', label: 'Decision Tree' },
+                { id: 'data', label: 'Data Display' }
+            ];
+
+            return (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h2 style={{ color: '#374151' }}>Live Agent Reasoning</h2>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <input
+                                type="text"
+                                value={sessionId}
+                                onChange={(e) => setSessionId(e.target.value)}
+                                placeholder="Enter session ID to monitor"
+                                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '14px' }}
+                            />
+                            <button onClick={clearEvents} style={{ padding: '8px 12px', fontSize: '12px', background: '#6b7280', color: 'white', border: 'none', borderRadius: '4px' }}>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
+                        {isConnected ? '🟢 Connected to session stream' : '🔴 Not connected'}
+                        {sessionId && ` - Session: ${sessionId.substring(0, 8)}...`}
+                    </div>
+
+                    <div className="tabs">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="tab-content">
+                        {activeTab === 'events' && <EventsLog events={events} />}
+                        {activeTab === 'tree' && <TreeVisualization events={events} />}
+                        {activeTab === 'data' && <DataDisplay events={events} />}
+                    </div>
+                </div>
+            );
+        }
+
+        // Events Log Component
+        function EventsLog({ events }) {
+            const getEventClassName = (eventType) => {
+                return `event-item ${eventType.replace('_', '-')}`;
+            };
+
+            const formatEventData = (data) => {
+                if (typeof data === 'object') {
+                    return JSON.stringify(data, null, 2);
+                }
+                return String(data);
+            };
+
+            return (
+                <div className="events-log">
+                    {events.length === 0 ? (
+                        <div className="loading">
+                            <div>No events yet. Start a conversation to see agent reasoning in real-time.</div>
+                        </div>
+                    ) : (
+                        events.slice().reverse().map((event, i) => (
+                            <div key={i} className={getEventClassName(event.type)}>
+                                <div className="event-header">
+                                    <span className="event-type">
+                                        {event.type.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                    <span className="event-time">
+                                        {new Date(event.timestamp * 1000).toLocaleTimeString()}
+                                    </span>
+                                </div>
+                                {event.data && (
+                                    <div className="event-data">
+                                        {formatEventData(event.data)}
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            );
+        }
+
+        // Tree Visualization Component
+        function TreeVisualization({ events }) {
+            const treeEvents = events.filter(e => e.type === 'tree_traversal');
+
+            React.useEffect(() => {
+                if (treeEvents.length > 0) {
+                    // Simple tree visualization using D3
+                    const container = d3.select('#tree-viz');
+                    container.selectAll('*').remove();
+
+                    const svg = container.append('svg')
+                        .attr('width', '100%')
+                        .attr('height', '250px');
+
+                    // Simple tree representation
+                    const nodeData = treeEvents.map((event, i) => ({
+                        id: event.current_node || `node-${i}`,
+                        x: 50 + (i * 100),
+                        y: 125,
+                        active: i === treeEvents.length - 1
+                    }));
+
+                    svg.selectAll('circle')
+                        .data(nodeData)
+                        .enter()
+                        .append('circle')
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y)
+                        .attr('r', 20)
+                        .attr('fill', d => d.active ? '#667eea' : '#e5e7eb')
+                        .attr('stroke', '#374151')
+                        .attr('stroke-width', 2);
+
+                    svg.selectAll('text')
+                        .data(nodeData)
+                        .enter()
+                        .append('text')
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y + 5)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', '12px')
+                        .attr('fill', d => d.active ? 'white' : '#374151')
+                        .text((d, i) => i + 1);
+
+                    // Draw connections
+                    for (let i = 0; i < nodeData.length - 1; i++) {
+                        svg.append('line')
+                            .attr('x1', nodeData[i].x + 20)
+                            .attr('y1', nodeData[i].y)
+                            .attr('x2', nodeData[i + 1].x - 20)
+                            .attr('y2', nodeData[i + 1].y)
+                            .attr('stroke', '#6b7280')
+                            .attr('stroke-width', 2)
+                            .attr('marker-end', 'url(#arrow)');
+                    }
+                }
+            }, [treeEvents]);
+
+            return (
+                <div>
+                    <div className="tree-visualization">
+                        <div id="tree-viz" style={{ width: '100%', height: '100%' }}></div>
+                    </div>
+                    <div style={{ padding: '15px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <h4>Tree Traversal Steps: {treeEvents.length}</h4>
+                        {treeEvents.slice(-3).map((event, i) => (
+                            <div key={i} style={{ margin: '8px 0', fontSize: '14px' }}>
+                                <strong>Step {treeEvents.length - 2 + i}:</strong> {event.reasoning || 'Processing...'}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Data Display Component
+        function DataDisplay({ events }) {
+            const dataEvents = events.filter(e => e.type === 'data_display');
+
+            const renderData = (event) => {
+                const { recommended_renderer, data } = event;
+                const content = data?.content;
+
+                if (!content) return null;
+
+                switch (recommended_renderer) {
+                    case 'table':
+                        return <TableRenderer data={content} />;
+                    case 'cards':
+                        return <CardsRenderer data={content} />;
+                    case 'key_value_pairs':
+                        return <KeyValueRenderer data={content} />;
+                    default:
+                        return <TextRenderer data={content} />;
+                }
+            };
+
+            return (
+                <div>
+                    {dataEvents.length === 0 ? (
+                        <div className="loading">
+                            <div>No data displays yet. Agent will show structured data here when available.</div>
+                        </div>
+                    ) : (
+                        dataEvents.map((event, i) => (
+                            <div key={i} className="data-renderer">
+                                <h4>{event.data?.title || 'Data Display'}</h4>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
+                                    Renderer: {event.recommended_renderer} |
+                                    Type: {event.data_type}
+                                </div>
+                                {renderData(event)}
+                            </div>
+                        ))
+                    )}
+                </div>
+            );
+        }
+
+        // Data Renderers
+        function TableRenderer({ data }) {
+            if (!Array.isArray(data) || data.length === 0) return <div>No table data</div>;
+
+            const keys = Object.keys(data[0] || {});
+
+            return (
+                <div className="table-renderer">
+                    <table>
+                        <thead>
+                            <tr>
+                                {keys.map(key => <th key={key}>{key}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map((row, i) => (
+                                <tr key={i}>
+                                    {keys.map(key => (
+                                        <td key={key}>
+                                            {typeof row[key] === 'object' ? JSON.stringify(row[key]) : String(row[key])}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function CardsRenderer({ data }) {
+            if (!Array.isArray(data)) return <TextRenderer data={data} />;
+
+            return (
+                <div className="cards-renderer">
+                    {data.map((item, i) => (
+                        <div key={i} className="card">
+                            <h5>{item.name || item.title || `Item ${i + 1}`}</h5>
+                            <div>
+                                {Object.entries(item).map(([key, value]) => (
+                                    key !== 'name' && key !== 'title' && (
+                                        <div key={key} style={{ margin: '4px 0' }}>
+                                            <strong>{key}:</strong> {String(value)}
+                                        </div>
+                                    )
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function KeyValueRenderer({ data }) {
+            const pairs = typeof data === 'object' ? Object.entries(data) : [];
+
+            return (
+                <div className="key-value-renderer">
+                    {pairs.map(([key, value]) => (
+                        <div key={key} className="key-value-pair">
+                            <div className="key">{key}</div>
+                            <div className="value">
+                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function TextRenderer({ data }) {
+            return (
+                <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '4px', fontFamily: 'monospace', fontSize: '14px' }}>
+                    {typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data)}
+                </div>
+            );
+        }
+
+        // Render the main application
+        function App() {
+            return (
+                <>
+                    <ChatInterface />
+                    <VisualizationArea />
+                </>
+            );
+        }
+
+        // Mount the React components
+        ReactDOM.render(<ChatInterface />, document.getElementById('chat-interface'));
+        ReactDOM.render(<VisualizationArea />, document.getElementById('visualization-area'));
+    </script>
+</body>
+</html>
