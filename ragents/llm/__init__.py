@@ -1,6 +1,13 @@
 """LLM client module with instructor-based type safety."""
 
 from .client import LLMClient
-from .types import ChatMessage, ModelResponse, ModelConfig
+from .types import ChatMessage, ModelResponse, ModelConfig, UsageInfo, TokenDetails
 
-__all__ = ["LLMClient", "ChatMessage", "ModelResponse", "ModelConfig"]
+__all__ = [
+    "LLMClient",
+    "ChatMessage",
+    "ModelResponse",
+    "ModelConfig",
+    "UsageInfo",
+    "TokenDetails",
+]

@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ModelProvider(str, Enum):
@@ -42,11 +42,31 @@ class ModelConfig(BaseModel):
     presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
 
 
+class TokenDetails(BaseModel):
+    """Token usage details."""
+    model_config = ConfigDict(extra="allow")
+    accepted_prediction_tokens: Optional[int] = 0
+    audio_tokens: Optional[int] = 0
+    cached_tokens: Optional[int] = 0
+    reasoning_tokens: Optional[int] = 0
+    rejected_prediction_tokens: Optional[int] = 0
+
+
+class UsageInfo(BaseModel):
+    """Usage information from LLM response."""
+    model_config = ConfigDict(extra="allow")
+    completion_tokens: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    completion_tokens_details: Optional[Union[TokenDetails, Dict[str, Any]]] = None
+    prompt_tokens_details: Optional[Union[TokenDetails, Dict[str, Any]]] = None
+
+
 class ModelResponse(BaseModel):
     """Structured response from LLM."""
     content: str
     model: str
-    usage: Optional[Dict[str, int]] = None
+    usage: Optional[Union[UsageInfo, Dict[str, Any]]] = None
     finish_reason: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
 
