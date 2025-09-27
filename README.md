@@ -332,7 +332,7 @@ The system is powered by Instructor for type-safe LLM interactions, ensuring rob
 
 ## 🔗 Links
 
-- [Documentation](https://ragents.readthedocs.io) *(coming soon)*
+- [Documentation](https://ragents.readthedocs.io/en/latest/)
 - [PyPI Package](https://pypi.org/project/ragents) 
 - [GitHub Repository](https://github.com/yourusername/ragents)
 - [Issues](https://github.com/yourusername/ragents/issues)
