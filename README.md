@@ -337,6 +337,3 @@ The system is powered by Instructor for type-safe LLM interactions, ensuring rob
 - [GitHub Repository](https://github.com/yourusername/ragents)
 - [Issues](https://github.com/yourusername/ragents/issues)
 
----
-
-**RAGents** - Build intelligent agents that think, reason, and learn with production-grade reliability and performance. 🤖✨
