@@ -5,9 +5,9 @@
 
   <p>
     <a href="https://pypi.org/project/ragents"><img alt="PyPI" src="https://img.shields.io/pypi/v/ragents?color=blue"></a>
-    <a href="https://github.com/yourusername/ragents/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/yourusername/ragents?color=green"></a>
-    <a href="https://github.com/yourusername/ragents"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/yourusername/ragents?style=social"></a>
-    <a href="https://codecov.io/gh/yourusername/ragents"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/yourusername/ragents"></a>
+    <a href="https://github.com/Mehranmzn/ragents/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/Mehranmzn/ragents?color=green"></a>
+    <a href="https://github.com/Mehranmzn/ragents"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/Mehranmzn/ragents?style=social"></a>
+    <a href="https://codecov.io/gh/Mehranmzn/ragents"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/Mehranmzn/ragents"></a>
   </p>
 
   <p>
