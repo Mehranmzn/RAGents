@@ -55,13 +55,6 @@ The ReAct Agent brings sophisticated iterative reasoning capabilities, combining
 
 The Graph Planner Agent introduces advanced project management capabilities through graph-based task modeling. It can analyze complex requirements, identify dependencies between subtasks, optimize resource allocation, and generate executable plans with built-in monitoring and adaptation capabilities. This agent type is especially powerful for workflow automation and multi-step process orchestration.
 
-### Logic-LLM Integration for Enhanced Reasoning
-
-The framework incorporates a sophisticated Logic-LLM module based on the Logic-LLM research, which fundamentally changes how language models approach reasoning tasks. This system identifies logical patterns in queries and applies symbolic reasoning techniques to solve problems more efficiently than traditional neural approaches alone. For mathematical calculations, logical deductions, and constraint satisfaction problems, this approach can reduce token usage by 60-80% while improving accuracy.
-
-The Logic-LLM implementation includes specialized components for different reasoning types. The Constraint Engine handles rule-based validation and satisfaction problems, while the Symbolic Solver manages mathematical computations and algebraic manipulations. The Query Clarifier provides interactive refinement capabilities, helping users formulate clearer, more answerable questions through guided clarification processes.
-
-Pattern recognition capabilities enable the system to identify recurring logical structures in queries and apply appropriate reasoning templates. This includes support for common patterns like modus ponens, syllogistic reasoning, and causal chains, allowing the system to handle complex logical arguments with mathematical precision.
 
 ### Advanced RAG Engine with Multimodal Processing
 
