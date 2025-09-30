@@ -74,20 +74,30 @@ class TextProcessor(DocumentProcessor):
             with open(file_path, 'r', encoding='latin-1') as f:
                 content = f.read()
 
+        from ..rag.types import DocumentType
+        import time
+
+        metadata = {
+            "file_type": "text",
+            "file_size": file_path.stat().st_size,
+            "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
+            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "encoding": "utf-8",
+            "line_count": content.count('\n') + 1,
+            "word_count": len(content.split()),
+            "char_count": len(content)
+        }
+
         return Document(
             id=str(file_path),
+            title=file_path.name,
             content=content,
-            source=str(file_path),
-            metadata={
-                "file_type": "text",
-                "file_size": file_path.stat().st_size,
-                "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-                "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
-                "encoding": "utf-8",
-                "line_count": content.count('\n') + 1,
-                "word_count": len(content.split()),
-                "char_count": len(content)
-            }
+            metadata=metadata,
+            doc_type=DocumentType.TEXT,
+            file_path=str(file_path),
+            created_at=time.time(),
+            updated_at=time.time(),
+            file_size=file_path.stat().st_size
         )
 
 
@@ -178,11 +188,19 @@ class PDFProcessor(DocumentProcessor):
             "tables_count": len(tables)
         })
 
+        from ..rag.types import DocumentType
+        import time
+
         return Document(
             id=str(file_path),
+            title=metadata.get("title") or file_path.name,
             content=content,
-            source=str(file_path),
-            metadata=metadata
+            metadata=metadata,
+            doc_type=DocumentType.PDF,
+            file_path=str(file_path),
+            created_at=time.time(),
+            updated_at=time.time(),
+            file_size=file_path.stat().st_size
         )
 
 
@@ -584,11 +602,19 @@ class DocxProcessor(DocumentProcessor):
             "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
         }
 
+        from ..rag.types import DocumentType
+        import time
+
         return Document(
             id=str(file_path),
+            title=props.title or file_path.name,
             content=content,
-            source=str(file_path),
-            metadata=metadata
+            metadata=metadata,
+            doc_type=DocumentType.DOCX,
+            file_path=str(file_path),
+            created_at=time.time(),
+            updated_at=time.time(),
+            file_size=file_path.stat().st_size
         )
 
 
@@ -672,3 +698,48 @@ class MultiModalProcessor:
     def get_supported_formats(self) -> List[str]:
         """Get all supported file formats."""
         return get_supported_formats()
+
+    async def process_document(self, file_path: str, **metadata) -> Document:
+        """Process a document file and return a Document object."""
+        path = Path(file_path)
+        document = await self.process_file(path)
+
+        if document and metadata:
+            # Add any extra metadata
+            document.metadata.update(metadata)
+
+        return document
+
+    async def chunk_document(self, document: Document) -> List[Dict[str, Any]]:
+        """Create chunks from a processed document."""
+        if not document.content:
+            return []
+
+        content = document.content
+        chunk_size = self.config.chunk_size
+        chunk_overlap = self.config.chunk_overlap
+
+        chunks = []
+        start = 0
+
+        while start < len(content):
+            end = start + chunk_size
+            chunk_content = content[start:end]
+
+            if chunk_content.strip():  # Only create non-empty chunks
+                chunks.append({
+                    "content": chunk_content,
+                    "metadata": {
+                        **document.metadata,
+                        "chunk_index": len(chunks),
+                        "start_char": start,
+                        "end_char": min(end, len(content)),
+                        "document_id": document.document_id,
+                    }
+                })
+
+            start = start + chunk_size - chunk_overlap
+            if start >= len(content):
+                break
+
+        return chunks

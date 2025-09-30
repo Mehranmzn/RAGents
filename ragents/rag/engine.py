@@ -37,7 +37,7 @@ class RAGEngine:
         self.processor = processor or MultiModalProcessor(config)
 
         # Initialize reranking components
-        self.reranking_config = getattr(config, 'reranking', RerankingConfig())
+        self.reranking_config = getattr(config, "reranking", RerankingConfig())
         self.reranker = reranker or self._init_default_reranker()
         self.autocut_filter = autocut_filter or AutocutFilter(
             strategy=self.reranking_config.cutoff_strategy
@@ -83,7 +83,9 @@ class RAGEngine:
 
         # Step 2.5: Apply reranking and Autocut filtering
         if self.reranker and retrieval_results:
-            retrieval_results = await self._apply_reranking_and_autocut(query, retrieval_results)
+            retrieval_results = await self._apply_reranking_and_autocut(
+                query, retrieval_results
+            )
 
         # Step 3: Generate answer with context
         answer, reasoning = await self._generate_answer(
@@ -91,7 +93,9 @@ class RAGEngine:
         )
 
         # Step 4: Calculate confidence score
-        confidence = await self._calculate_confidence(context, retrieval_results, answer)
+        confidence = await self._calculate_confidence(
+            context, retrieval_results, answer
+        )
 
         processing_time = time.time() - start_time
 
@@ -169,7 +173,7 @@ class RAGEngine:
         context_text = "\n\n".join(
             [
                 f"Source {i+1} (score: {result.score:.3f}):\n{result.chunk.content}"
-                for i, result in enumerate(retrieval_results[:self.config.top_k])
+                for i, result in enumerate(retrieval_results[: self.config.top_k])
             ]
         )
 
@@ -181,14 +185,14 @@ class RAGEngine:
             )
 
             user_prompt = f"""
-Context Information:
-{context_text}
+            Context Information:
+            {context_text}
 
-Question: {context.original_query}
+            Question: {context.original_query}
 
-Please provide a detailed answer based on the context above. If the context doesn't
-contain enough information to fully answer the question, state this clearly.
-"""
+            Please provide a detailed answer based on the context above. If the context doesn't
+            contain enough information to fully answer the question, state this clearly.
+            """
 
             messages = [
                 ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
@@ -225,7 +229,7 @@ Answer:"""
 
     def _init_default_reranker(self) -> Reranker:
         """Initialize default reranker based on configuration."""
-        if hasattr(self.reranking_config, 'strategy'):
+        if hasattr(self.reranking_config, "strategy"):
             if self.reranking_config.strategy.value == "hybrid":
                 return HybridReranker(weights=self.reranking_config.fusion_weights)
             elif self.reranking_config.strategy.value == "semantic":
@@ -244,21 +248,21 @@ Answer:"""
         retrieved_docs = []
         for result in retrieval_results:
             doc = RetrievedDocument(
-                content=result.chunk.content if hasattr(result, 'chunk') else str(result),
-                metadata=getattr(result, 'metadata', {}),
-                similarity_score=getattr(result, 'score', 0.5),
-                document_id=getattr(result, 'document_id', None),
-                source=getattr(result, 'source', None),
-                chunk_index=getattr(result, 'chunk_index', None)
+                content=(
+                    result.chunk.content if hasattr(result, "chunk") else str(result)
+                ),
+                metadata=getattr(result, "metadata", {}),
+                similarity_score=getattr(result, "score", 0.5),
+                document_id=getattr(result, "document_id", None),
+                source=getattr(result, "source", None),
+                chunk_index=getattr(result, "chunk_index", None),
             )
             retrieved_docs.append(doc)
 
         # Apply reranking
         try:
             reranking_result = await self.reranker.rerank(
-                query,
-                retrieved_docs,
-                top_k=self.reranking_config.top_k
+                query, retrieved_docs, top_k=self.reranking_config.top_k
             )
             reranked_docs = reranking_result.reranked_documents
         except Exception as e:
@@ -269,19 +273,20 @@ Answer:"""
         if self.reranking_config.enable_autocut and self.autocut_filter:
             try:
                 filtered_docs, cutoff_result = self.autocut_filter.filter_documents(
-                    reranked_docs,
-                    strategy=self.reranking_config.cutoff_strategy
+                    reranked_docs, strategy=self.reranking_config.cutoff_strategy
                 )
                 reranked_docs = filtered_docs
 
                 # Log cutoff results for analysis
-                print(f"Autocut applied: kept {cutoff_result.kept_count}, removed {cutoff_result.removed_count}")
+                print(
+                    f"Autocut applied: kept {cutoff_result.kept_count}, removed {cutoff_result.removed_count}"
+                )
 
             except Exception as e:
                 print(f"Autocut filtering failed: {e}, using all reranked documents")
 
         # Convert back to original format (simple conversion for compatibility)
-        return reranked_docs[:self.reranking_config.max_documents]
+        return reranked_docs[: self.reranking_config.max_documents]
 
     async def _calculate_confidence(
         self, context: QueryContext, retrieval_results, answer: str

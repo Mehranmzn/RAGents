@@ -331,23 +331,35 @@
     </div>
 
     <script type="text/babel">
+    {% raw %}
         // Chat Interface Component
         function ChatInterface() {
             const [sessionId, setSessionId] = React.useState('');
             const [message, setMessage] = React.useState('');
             const [agentType, setAgentType] = React.useState('decision_tree');
             const [isLoading, setIsLoading] = React.useState(false);
+            const [chatHistory, setChatHistory] = React.useState([]);
 
             const sendMessage = async () => {
                 if (!message.trim() || isLoading) return;
 
+                const userMessage = message.trim();
                 setIsLoading(true);
+                setMessage('');
+
+                // Add user message to chat history immediately
+                setChatHistory(prev => [...prev, {
+                    type: 'user',
+                    content: userMessage,
+                    timestamp: new Date().toLocaleTimeString()
+                }]);
+
                 try {
                     const response = await fetch('/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            message,
+                            message: userMessage,
                             agent_type: agentType,
                             session_id: sessionId || undefined
                         })
@@ -355,9 +367,21 @@
 
                     const result = await response.json();
                     setSessionId(result.session_id);
-                    setMessage('');
+
+                    // Add agent response to chat history
+                    setChatHistory(prev => [...prev, {
+                        type: 'agent',
+                        content: result.response,
+                        timestamp: new Date().toLocaleTimeString()
+                    }]);
                 } catch (error) {
                     console.error('Error sending message:', error);
+                    // Add error message to chat history
+                    setChatHistory(prev => [...prev, {
+                        type: 'error',
+                        content: 'Error: Failed to get response from agent',
+                        timestamp: new Date().toLocaleTimeString()
+                    }]);
                 } finally {
                     setIsLoading(false);
                 }
@@ -367,6 +391,10 @@
                 if (e.key === 'Enter' && e.ctrlKey) {
                     sendMessage();
                 }
+            };
+
+            const clearChat = () => {
+                setChatHistory([]);
             };
 
             return (
@@ -395,15 +423,77 @@
                         </select>
                     </div>
 
-                    <div className="input-group" style={{ flex: 1 }}>
+                    {/* Chat History */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '200px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <label>Chat History</label>
+                            {chatHistory.length > 0 && (
+                                <button
+                                    onClick={clearChat}
+                                    style={{ fontSize: '12px', padding: '4px 8px', background: '#6b7280', color: 'white', border: 'none', borderRadius: '4px' }}
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                        <div style={{
+                            flex: 1,
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '8px',
+                            padding: '15px',
+                            overflowY: 'auto',
+                            backgroundColor: '#f8fafc',
+                            marginBottom: '15px'
+                        }}>
+                            {chatHistory.length === 0 ? (
+                                <div style={{ color: '#6b7280', fontStyle: 'italic', textAlign: 'center', marginTop: '50px' }}>
+                                    No messages yet. Start a conversation!
+                                </div>
+                            ) : (
+                                chatHistory.map((msg, i) => (
+                                    <div key={i} style={{
+                                        marginBottom: '15px',
+                                        padding: '12px',
+                                        borderRadius: '8px',
+                                        backgroundColor: msg.type === 'user' ? '#e0f2fe' : msg.type === 'error' ? '#fee2e2' : '#f0f9ff',
+                                        borderLeft: `4px solid ${msg.type === 'user' ? '#0ea5e9' : msg.type === 'error' ? '#ef4444' : '#667eea'}`
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <strong style={{ color: '#374151' }}>
+                                                {msg.type === 'user' ? '👤 You' : msg.type === 'error' ? '❌ Error' : '🤖 Agent'}
+                                            </strong>
+                                            <span style={{ fontSize: '12px', color: '#6b7280' }}>{msg.timestamp}</span>
+                                        </div>
+                                        <div style={{ color: '#374151', whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                                    </div>
+                                ))
+                            )}
+                            {isLoading && (
+                                <div style={{
+                                    marginBottom: '15px',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    backgroundColor: '#f0f9ff',
+                                    borderLeft: '4px solid #667eea'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <div className="spinner"></div>
+                                        <strong style={{ color: '#374151' }}>🤖 Agent is thinking...</strong>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="input-group">
                         <label>Message (Ctrl+Enter to send)</label>
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onKeyDown={handleKeyPress}
                             placeholder="Ask the agent something..."
-                            rows={6}
-                            style={{ resize: 'none', height: '150px' }}
+                            rows={4}
+                            style={{ resize: 'none' }}
                         />
                     </div>
 
@@ -415,7 +505,7 @@
                         {isLoading ? 'Processing...' : 'Send Message'}
                     </button>
 
-                    <div style={{ marginTop: '20px', fontSize: '14px', color: '#6b7280' }}>
+                    <div style={{ marginTop: '10px', fontSize: '14px', color: '#6b7280' }}>
                         💡 Tips: Try asking about complex topics to see the agent's reasoning process in action
                     </div>
                 </div>
@@ -763,6 +853,7 @@
         // Mount the React components
         ReactDOM.render(<ChatInterface />, document.getElementById('chat-interface'));
         ReactDOM.render(<VisualizationArea />, document.getElementById('visualization-area'));
+    {% endraw %}
     </script>
 </body>
 </html>

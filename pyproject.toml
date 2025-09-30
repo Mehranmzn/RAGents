@@ -34,6 +34,13 @@ dependencies = [
     "psutil>=5.9.0",
     "prometheus-client>=0.16.0",
     "mkdocs>=1.6.1",
+    "chainlit>=2.8.0",
+    "nicegui>=2.24.2",
+    "fastapi-users>=14.0.1",
+    "passlib>=1.7.4",
+    "python-jose>=3.5.0",
+    "sqlalchemy>=2.0.43",
+    "bcrypt>=4.3.0",
 ]
 
 [project.optional-dependencies]
