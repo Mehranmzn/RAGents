@@ -198,6 +198,22 @@ python examples/logical_llm_demo.py
 
 The interactive demo showcases real-time RAG capabilities with document upload, multimodal processing including image analysis, agent comparison across different reasoning approaches, live evaluation metrics, and comprehensive observability features including distributed tracing visualization.
 
+#### Frontend Screenshots
+
+<div align="center">
+  <img src="assets/auth_page.png" alt="Authentication Page" width="800" />
+  <p><em>Secure authentication with API key management</em></p>
+
+  <img src="assets/config_page.png" alt="Agent Configuration Page" width="800" />
+  <p><em>Flexible agent configuration with multiple LLM providers and vector stores</em></p>
+
+  <img src="assets/main_page.png" alt="Chat Interface" width="800" />
+  <p><em>Interactive chat interface with real-time RAG responses</em></p>
+
+  <img src="assets/vector_dbs.png" alt="Vector Database Support" width="800" />
+  <p><em>Multiple vector database backends for enterprise scalability</em></p>
+</div>
+
 ### ⚡ Logical LLM Integration
 
 RAGents includes a powerful Logical LLM module based on Logic-LLM research that enhances reasoning capabilities while reducing token usage through symbolic reasoning and constraint satisfaction. The system identifies logical patterns in queries and applies appropriate symbolic reasoning techniques, dramatically reducing computational overhead for mathematical problems, logical deductions, and constraint satisfaction tasks.
