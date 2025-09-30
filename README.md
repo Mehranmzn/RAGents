@@ -101,7 +101,7 @@ Response validation includes multiple fallback strategies for handling edge case
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ragents.git
+git clone https://github.com/Mehranmzn/ragents.git
 cd ragents
 
 # Basic installation
