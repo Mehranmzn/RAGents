@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.svg" alt="RAGents Logo" width="200" height="200" />
+  <img src="assets/logo.svg" alt="RAGents Logo" width="300" height="200" />
   <h1>RAGents 🤖</h1>
   <p><strong>Production-Ready Agentic RAG Framework with Intelligent Decision Trees and Logic-LLM Integration</strong></p>
 
