@@ -62,6 +62,9 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
     "pymdown-extensions>=10.0.0",
 ]
+
+# Frontend UI (separate package)
+frontend = ["ragents-frontend>=0.1.0"]
 # Vector store backends
 weaviate = ["weaviate-client>=4.0.0"]
 pgvector = ["asyncpg>=0.28.0"]

@@ -202,12 +202,8 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 
-# Frontend build artifacts
-ragents-frontend/node_modules/
-ragents-frontend/.next/
-ragents-frontend/out/
-ragents-frontend/*.tsbuildinfo
-ragents-frontend/package-lock.json
+# Frontend (separate repository)
+ragents-frontend/
 
 # Chainlit
 .chainlit/
