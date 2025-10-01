@@ -286,11 +286,18 @@ async def setup_agent(agent_type: str):
             llm_config = get_llm_config_from_env()
             llm_client = LLMClient(config=llm_config)
 
-            # Setup RAG engine if documents are available
-            rag_engine = None
+            # Setup RAG engine (always initialize it, documents can be added later)
+            rag_config = RAGConfig()
+            rag_engine = RAGEngine(config=rag_config, llm_client=llm_client)
+
+            # If documents were already uploaded, ingest them into the RAG engine
             if session["processed_documents"]:
-                rag_config = RAGConfig()
-                rag_engine = RAGEngine(config=rag_config, llm_client=llm_client)
+                for doc_info in session["processed_documents"]:
+                    if doc_info.get("status") == "success" and doc_info.get("path"):
+                        try:
+                            await rag_engine.add_document(doc_info["path"], source=doc_info["name"])
+                        except Exception as e:
+                            print(f"Error re-ingesting document {doc_info['name']}: {e}")
 
             # Create agent based on type with proper configuration
             agent_name = agent_type.replace('_', ' ').title()
@@ -391,21 +398,28 @@ async def handle_file_uploads(files: List):
                                 content = await src.read()
                                 await f.write(content)
 
-                    # Simulate chunking process with streaming updates
-                    progress_msg.content = (
-                        f"📤 **Processing Files...** ({i}/{total_files})\n\n"
-                        f"✂️ Chunking: **{file.name}**\n📊 Progress: {i}/{total_files}"
-                    )
-                    await progress_msg.update()
-                    await asyncio.sleep(0.3)
+                    # Actually ingest into RAG engine if it exists
+                    rag_engine = session.get("rag_engine")
+                    if rag_engine:
+                        # Chunking process
+                        progress_msg.content = (
+                            f"📤 **Processing Files...** ({i}/{total_files})\n\n"
+                            f"✂️ Chunking: **{file.name}**\n📊 Progress: {i}/{total_files}"
+                        )
+                        await progress_msg.update()
 
-                    # Simulate embedding process with streaming updates
-                    progress_msg.content = (
-                        f"📤 **Processing Files...** ({i}/{total_files})\n\n"
-                        f"🧠 Embedding: **{file.name}**\n📊 Progress: {i}/{total_files}"
-                    )
-                    await progress_msg.update()
-                    await asyncio.sleep(0.3)
+                        # Embedding process - actually add to RAG engine
+                        progress_msg.content = (
+                            f"📤 **Processing Files...** ({i}/{total_files})\n\n"
+                            f"🧠 Embedding: **{file.name}**\n📊 Progress: {i}/{total_files}"
+                        )
+                        await progress_msg.update()
+
+                        # Add document to RAG engine
+                        await rag_engine.add_document(str(file_path), source=file.name)
+                    else:
+                        # No RAG engine yet - just simulate progress
+                        await asyncio.sleep(0.6)
 
                     # Track processed file
                     file_size = file_path.stat().st_size if file_path.exists() else 0
@@ -516,12 +530,18 @@ async def main(message: cl.Message):
 
                 # Process with agent (simplified - in real implementation, use actual streaming)
                 try:
-                    if hasattr(agent, 'process_async'):
+                    if hasattr(agent, 'process_message'):
+                        response = await agent.process_message(message.content)
+                    elif hasattr(agent, 'process_async'):
                         response = await agent.process_async(message.content)
-                    else:
-                        # Fallback for agents without async support
+                    elif hasattr(agent, 'process'):
                         response = agent.process(message.content)
+                    else:
+                        response = "Agent does not have a valid processing method."
                 except Exception as agent_error:
+                    import traceback
+                    error_details = traceback.format_exc()
+                    print(f"Agent error: {error_details}")
                     response = f"I apologize, but I encountered an error processing your message: {str(agent_error)}"
 
                 # Stream the response for better UX
