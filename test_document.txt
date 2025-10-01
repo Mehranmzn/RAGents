@@ -1,0 +1,20 @@
+This is a test document for RAGents.
+
+The RAGents framework is an advanced agentic RAG system that combines intelligent decision-tree agents with multimodal RAG capabilities. It includes features like:
+
+1. Decision Tree Agents - For complex decision making and structured reasoning
+2. Graph Planner Agents - For graph-based planning and relationship mapping
+3. ReAct Agents - For tool integration and reasoning & acting
+4. Multimodal Processing - Support for text, images, and other media types
+5. Type-safe LLM Interactions - Using the instructor package for structured outputs
+
+The system supports various document formats including PDF, TXT, MD, DOCX, and CSV files. Documents are processed through an ingestion pipeline that chunks the content and creates embeddings for efficient retrieval.
+
+Key benefits of RAGents:
+- Real-time agent transparency and visualization
+- Streaming responses for better user experience
+- Observability with metrics, tracing, and logging
+- Scalable document processing with multiple vector database options
+- Advanced query rewriting and response optimization
+
+This document should be searchable once uploaded to the system.
