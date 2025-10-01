@@ -185,3 +185,31 @@ models/
 checkpoints/
 wandb/
 mlruns/
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Frontend build artifacts
+ragents-frontend/node_modules/
+ragents-frontend/.next/
+ragents-frontend/out/
+ragents-frontend/*.tsbuildinfo
+ragents-frontend/package-lock.json
+
+# Chainlit
+.chainlit/
+.files/
+uploads/
