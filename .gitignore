@@ -209,3 +209,4 @@ ragents-frontend/
 .chainlit/
 .files/
 uploads/
+.calaude/
