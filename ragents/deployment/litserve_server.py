@@ -19,8 +19,10 @@ from ..llm.types import ModelConfig
 from ..rag.engine import RAGEngine
 from ..config.rag_config import RAGConfig
 from ..logical_llm.integration import LogicalAgent, LogicalLLMIntegration
-from .monitoring import MetricsCollector
-from .health_checks import HealthChecker
+# Monitoring moved to Opik
+# from .monitoring import MetricsCollector
+# from .health_checks import HealthChecker
+import opik
 
 
 # Request/Response Models

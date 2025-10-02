@@ -22,7 +22,8 @@ from .extractors import (
     ContentAnalyzer,
 )
 from .validators import DocumentValidator, ValidationResult
-from .monitoring import IngestionMonitor, IngestionStats
+# Monitoring removed - use Opik for observability
+# from .monitoring import IngestionMonitor, IngestionStats
 
 __all__ = [
     "IngestionPipeline",
@@ -40,6 +41,6 @@ __all__ = [
     "ContentAnalyzer",
     "DocumentValidator",
     "ValidationResult",
-    "IngestionMonitor",
-    "IngestionStats",
+    # "IngestionMonitor",
+    # "IngestionStats",
 ]

@@ -28,8 +28,8 @@ from .vector_stores import create_vector_store, VectorStoreConfig
 # Evaluation
 from .evaluation import RAGEvaluator, create_sample_dataset
 
-# Observability
-from .observability import RAGTracer, OpenInferenceIntegration, MetricsCollector
+# Observability (now using Opik)
+# from .observability import RAGTracer, OpenInferenceIntegration, MetricsCollector
 
 # Tools
 from .tools import tool, ToolRegistry
@@ -94,10 +94,10 @@ __all__ = [
     "RAGEvaluator",
     "create_sample_dataset",
 
-    # Observability
-    "RAGTracer",
-    "OpenInferenceIntegration",
-    "MetricsCollector",
+    # Observability (now using Opik)
+    # "RAGTracer",
+    # "OpenInferenceIntegration",
+    # "MetricsCollector",
 
     # Tools
     "tool",
