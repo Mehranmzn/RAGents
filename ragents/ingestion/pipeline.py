@@ -13,8 +13,12 @@ from .config import IngestionConfig, IngestionResult
 from .processors import DocumentProcessor, get_processor_for_file
 from .validators import DocumentValidator, ValidationResult
 from .extractors import MetadataExtractor, ContentAnalyzer
-from .monitoring import IngestionMonitor, IngestionStats
+# Monitoring removed - use Opik for observability
+# from .monitoring import IngestionMonitor, IngestionStats
 from ..rag.types import Document
+
+# Opik integration
+import opik
 
 
 
@@ -27,11 +31,11 @@ class IngestionPipeline:
         self,
         config: IngestionConfig = IngestionConfig(),
         validator: Optional[DocumentValidator] = None,
-        monitor: Optional[IngestionMonitor] = None
+        opik_client: Optional[opik.Opik] = None
     ):
         self.config = config
         self.validator = validator or DocumentValidator()
-        self.monitor = monitor or IngestionMonitor()
+        self.opik_client = opik_client or opik.Opik()
         self.metadata_extractor = MetadataExtractor()
         self.content_analyzer = ContentAnalyzer()
 
@@ -41,10 +45,14 @@ class IngestionPipeline:
         # Processing history
         self.processing_history: List[IngestionResult] = []
 
+    @opik.track()
     async def ingest_file(self, file_path: Union[str, Path]) -> IngestionResult:
         """Ingest a single file."""
         start_time = datetime.now()
         file_path = Path(file_path)
+
+        # Track with Opik
+        opik.track_metadata({"file_path": str(file_path), "file_size": file_path.stat().st_size if file_path.exists() else 0})
 
         try:
             # Validate file
@@ -105,8 +113,14 @@ class IngestionPipeline:
                 }
             )
 
-            # Update monitoring
-            self.monitor.record_success(result)
+            # Track success with Opik
+            opik.track_metadata({
+                "success": True,
+                "processing_time": processing_time,
+                "chunks_created": chunks_created,
+                "processor_type": processor.__class__.__name__
+            })
+
             self.processing_history.append(result)
 
             return result
@@ -120,7 +134,13 @@ class IngestionPipeline:
                 processing_time=processing_time
             )
 
-            self.monitor.record_error(error_result)
+            # Track error with Opik
+            opik.track_metadata({
+                "success": False,
+                "error_message": str(e),
+                "processing_time": processing_time
+            })
+
             self.processing_history.append(error_result)
 
             if not self.config.skip_errors:
@@ -240,9 +260,9 @@ class IngestionPipeline:
 
         return await self.ingest_multiple_paths(paths)
 
-    def get_stats(self) -> IngestionStats:
-        """Get ingestion statistics."""
-        return self.monitor.get_stats()
+    def get_stats(self) -> Dict[str, Any]:
+        """Get ingestion statistics from processing history."""
+        return self.get_processing_summary()
 
     def get_processing_summary(self) -> Dict[str, Any]:
         """Get summary of processing results."""
@@ -286,7 +306,6 @@ class IngestionPipeline:
     def reset_history(self):
         """Reset processing history."""
         self.processing_history.clear()
-        self.monitor.reset()
 
     async def validate_pipeline_health(self) -> Dict[str, Any]:
         """Validate that the ingestion pipeline is healthy."""
