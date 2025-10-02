@@ -6,36 +6,14 @@ This document provides a comprehensive explanation of all changes made to transf
 
 We implemented a complete scalability and observability overhaul across **three feature branches**:
 
-1. **feature/observability-monitoring** - Opik integration + Phase 1 (caching & checkpointing)
-2. **feature/bentoml-deployment** - BentoML service for production deployment
-3. **feature/scalability-phase3** - Rate limiting + Kubernetes auto-scaling
+1. **observability-monitoring** - Opik integration + Phase 1 (caching & checkpointing)
+2. **bentoml-deployment** - BentoML service for production deployment
+3. **scalability** - Rate limiting + Kubernetes auto-scaling
 
 ---
 
-## 🌿 Branch 1: Observability & Phase 1 Scalability
+## 🌿Observability & Phase 1 Scalability
 
-**Branch:** `feature/observability-monitoring`
-
-### Changes Made
-
-#### 1. Migrated from OpenTelemetry to Opik
-
-**Files Modified:**
-- `pyproject.toml` - Changed `observability = ["opik>=0.1.0"]`
-- `ragents/__init__.py` - Commented out old observability exports
-- `ragents/ingestion/__init__.py` - Removed monitoring imports
-- `ragents/ingestion/pipeline.py` - Integrated Opik tracking
-- `ragents/deployment/__init__.py` - Removed old monitoring references
-- `ragents/deployment/litserve_server.py` - Added Opik imports
-
-**Files Deleted:**
-- `ragents/observability/` (entire directory)
-  - `__init__.py`
-  - `tracer.py`
-  - `metrics.py`
-  - `openinference.py`
-  - `structured_logging.py`
-- `ragents/ingestion/monitoring.py`
 
 **Why?**
 - **Opik is purpose-built for LLM applications** with better tracing
@@ -59,9 +37,8 @@ async def ingest_file(self, file_path: str):
     })
 ```
 
-#### 2. Added Distributed Caching (Phase 1)
+#### 2. Added Distributed Caching 
 
-**New File:** `ragents/rag/cache.py`
 
 **Features:**
 - Redis-based distributed cache for embeddings, retrievals, and query rewrites
@@ -123,9 +100,8 @@ class RAGEngine:
         await self.cache.cache_retrieval(query, response.model_dump())
 ```
 
-#### 3. Added Distributed Checkpointing (Phase 1)
+#### 3. Added Distributed Checkpointing 
 
-**New File:** `ragents/agents/checkpointing.py`
 
 **Features:**
 - Two backend options: **Redis** (fast) or **PostgreSQL** (persistent)
@@ -207,34 +183,10 @@ CREATE TABLE langgraph_checkpoints (
 );
 ```
 
-#### 4. Updated pyproject.toml
-
-**Changes:**
-```toml
-# Observability
-observability = ["opik>=0.1.0"]
-
-# Scalability (NEW)
-scalability = ["redis>=5.0.0", "asyncpg>=0.29.0"]
-```
-
-**Installation:**
-```bash
-# Install with observability
-pip install -e ".[observability]"
-
-# Install with scalability features
-pip install -e ".[scalability]"
-
-# Install everything
-pip install -e ".[observability,scalability]"
-```
-
 ---
 
-## 🌿 Branch 2: BentoML Production Deployment
+## 🌿 BentoML Production Deployment
 
-**Branch:** `feature/bentoml-deployment`
 
 ### Why BentoML over LitServe?
 
@@ -248,11 +200,6 @@ pip install -e ".[observability,scalability]"
 | Production features | Minimal | Extensive |
 | Monitoring integration | Basic | Native Prometheus + Opik |
 
-### Changes Made
-
-#### 1. BentoML Service Implementation
-
-**New File:** `ragents/deployment/bentoml_service.py`
 
 **Features:**
 - Production-grade service with multiple agent types
@@ -331,35 +278,8 @@ async def initialize(self, config: ServiceConfig):
     await self._initialize_agents()
 ```
 
-#### 2. BentoML Configuration Files
 
-**New File:** `bentofile.yaml`
-```yaml
-service: "ragents.deployment.bentoml_service:RAGentsService"
-labels:
-  owner: ragents-team
-  project: ragents
-
-python:
-  requirements_txt: "./requirements-bentoml.txt"
-  lock_packages: true
-
-docker:
-  distro: debian
-  python_version: "3.10"
-  system_packages:
-    - git
-    - build-essential
-```
-
-**New File:** `requirements-bentoml.txt`
-- Lists all production dependencies
-- Includes bentoml, opik, redis, asyncpg
-- Locks versions for reproducibility
-
-#### 3. Deployment Example
-
-**New File:** `examples/deploy_bentoml.py`
+#### 2. Deployment Example
 
 Shows complete setup:
 ```python
@@ -378,17 +298,6 @@ checkpoint_config = CheckpointConfig(backend="redis")
 # Create service
 service = RAGentsService()
 await service.initialize(ServiceConfig(...))
-```
-
-#### 4. Updated pyproject.toml
-
-```toml
-deployment = [
-    "litserve>=0.2.0",
-    "bentoml>=1.2.0",  # NEW
-    "gunicorn>=21.0.0",
-    ...
-]
 ```
 
 ### Usage
@@ -416,15 +325,8 @@ bentoml deploy ragents:latest --cluster-name production
 
 ---
 
-## 🌿 Branch 3: Rate Limiting & Auto-Scaling
+## 🌿Rate Limiting & Auto-Scaling
 
-**Branch:** `feature/scalability-phase3`
-
-### Changes Made
-
-#### 1. Rate Limiting System
-
-**New File:** `ragents/deployment/rate_limiting.py`
 
 **Features:**
 - Token bucket algorithm for smooth rate control
@@ -489,8 +391,6 @@ user_id, data, priority = await limiter.dequeue_request()  # FIFO within priorit
 - **Graceful degradation** - Queuing instead of rejection
 
 #### 2. Kubernetes Auto-Scaling
-
-**New File:** `k8s/deployment.yaml`
 
 **Features:**
 - Horizontal Pod Autoscaler (HPA) for automatic scaling
@@ -617,8 +517,6 @@ resources:
 
 #### 3. Redis StatefulSet
 
-**New File:** `k8s/redis.yaml`
-
 **Features:**
 - StatefulSet for stable network identity
 - Persistent volume for data durability
@@ -655,27 +553,6 @@ spec:
         requests:
           storage: 20Gi
 ```
-
-#### 4. Comprehensive Documentation
-
-**New File:** `k8s/README.md`
-
-Covers:
-- Architecture diagram
-- Prerequisites and setup
-- Deployment instructions
-- Scaling strategies (vertical and horizontal)
-- High availability configuration
-- Monitoring and troubleshooting
-- Security best practices
-- Backup and disaster recovery
-- Load testing guides
-- Cost optimization tips
-
-**New File:** `k8s/secrets.yaml.example`
-
-Template for API keys and credentials.
-
 ---
 
 ## 📊 Performance Impact
@@ -957,45 +834,3 @@ rate_limit_config = RateLimitConfig(
 
 ---
 
-## 🎓 Learning Resources
-
-### Next Steps
-
-1. **Test locally** with Docker Compose
-2. **Deploy to minikube** for local K8s testing
-3. **Deploy to staging** environment
-4. **Load test** with k6 or Locust
-5. **Monitor** with Prometheus + Grafana
-6. **Optimize** based on metrics
-
-### Advanced Topics
-
-- **Service Mesh** - Add Istio for advanced traffic management
-- **GitOps** - Use ArgoCD for declarative deployments
-- **Multi-Region** - Deploy across multiple regions for global availability
-- **Disaster Recovery** - Set up backup and restore procedures
-- **Cost Optimization** - Use spot instances and cluster autoscaler
-
----
-
-## ✨ Summary
-
-We transformed RAGents from a basic service into a **production-ready, enterprise-scale** system with:
-
-1. **Modern Observability** - Opik for LLM-specific tracing
-2. **Distributed Caching** - 80-90% latency reduction
-3. **Distributed Checkpointing** - Stateful horizontal scaling
-4. **BentoML Deployment** - Production-grade serving platform
-5. **Rate Limiting** - Fair resource allocation and abuse prevention
-6. **Kubernetes Auto-Scaling** - Handle 10x traffic automatically
-7. **High Availability** - 99.9% uptime with multi-replica deployment
-8. **Comprehensive Documentation** - Production deployment guides
-
-**Result:** A system that can handle millions of requests per day with sub-second latency, automatic scaling, and full observability.
-
----
-
-**Questions? Issues?**
-- GitHub: [your-repo]/issues
-- Docs: [your-docs-site]
-- Email: support@ragents.ai
