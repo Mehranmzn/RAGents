@@ -1,0 +1,172 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragents-service
+  namespace: production
+  labels:
+    app: ragents
+    version: v1
+spec:
+  replicas: 3  # Initial replicas (auto-scaled by HPA)
+  selector:
+    matchLabels:
+      app: ragents
+  template:
+    metadata:
+      labels:
+        app: ragents
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: ragents
+        image: ragents:latest  # Replace with your registry
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragents-secrets
+              key: openai-api-key
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragents-secrets
+              key: anthropic-api-key
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: CHECKPOINT_REDIS_URL
+          value: "redis://redis-service:6379/1"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: ragents-secrets
+              key: postgres-url
+        - name: RAGENTS_ENV
+          value: "production"
+        - name: OPIK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragents-secrets
+              key: opik-api-key
+              optional: true
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # Allow 5 minutes for startup
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragents-service
+  namespace: production
+  labels:
+    app: ragents
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: ragents
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ragents-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ragents-service
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Scale when CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Scale when memory > 80%
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"  # Scale when RPS > 100 per pod
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60  # Wait 1 min before scaling up
+      policies:
+      - type: Percent
+        value: 50  # Scale up by 50% at a time
+        periodSeconds: 60
+      - type: Pods
+        value: 2  # Or add 2 pods at a time
+        periodSeconds: 60
+      selectPolicy: Max  # Use the larger of the two
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down
+      policies:
+      - type: Percent
+        value: 10  # Scale down by 10% at a time
+        periodSeconds: 60
+      - type: Pods
+        value: 1  # Or remove 1 pod at a time
+        periodSeconds: 60
+      selectPolicy: Min  # Use the smaller of the two
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ragents-pdb
+  namespace: production
+spec:
+  minAvailable: 2  # Maintain at least 2 pods during disruptions
+  selector:
+    matchLabels:
+      app: ragents
