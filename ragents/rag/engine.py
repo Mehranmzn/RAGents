@@ -15,6 +15,7 @@ from ..reranking.config import RerankingConfig
 from .document_store import DocumentStore
 from .retriever import Retriever
 from .types import Document, QueryContext, RAGResponse
+from .cache import RAGCache, CacheConfig
 
 
 class RAGEngine:
@@ -29,12 +30,19 @@ class RAGEngine:
         processor: Optional[MultiModalProcessor] = None,
         reranker: Optional[Reranker] = None,
         autocut_filter: Optional[AutocutFilter] = None,
+        cache: Optional[RAGCache] = None,
+        cache_config: Optional[CacheConfig] = None,
     ):
         self.config = config
         self.llm_client = llm_client
         self.document_store = document_store or DocumentStore(config)
         self.retriever = retriever or Retriever(config, self.document_store)
         self.processor = processor or MultiModalProcessor(config)
+
+        # Initialize caching layer
+        self.cache = cache
+        self.cache_config = cache_config
+        self._cache_initialized = False
 
         # Initialize reranking components
         self.reranking_config = getattr(config, "reranking", RerankingConfig())
@@ -62,6 +70,16 @@ class RAGEngine:
         tasks = [self.add_document(path) for path in file_paths]
         return await asyncio.gather(*tasks)
 
+    async def _ensure_cache_initialized(self):
+        """Ensure cache is initialized."""
+        if not self._cache_initialized and self.cache_config:
+            if self.cache is None:
+                from .cache import get_cache
+                self.cache = await get_cache(self.cache_config)
+            elif not self.cache._initialized:
+                await self.cache.initialize()
+            self._cache_initialized = True
+
     async def query(
         self,
         query: str,
@@ -70,6 +88,17 @@ class RAGEngine:
     ) -> RAGResponse:
         """Query the RAG system with optional structured thinking."""
         start_time = time.time()
+
+        # Initialize cache if configured
+        await self._ensure_cache_initialized()
+
+        # Check cache for retrieval results
+        cached_result = None
+        if self.cache:
+            cached_result = await self.cache.get_retrieval(query, self.config.top_k)
+            if cached_result:
+                # Return cached response
+                return RAGResponse(**cached_result)
 
         if context is None:
             context = QueryContext(original_query=query)
@@ -99,7 +128,7 @@ class RAGEngine:
 
         processing_time = time.time() - start_time
 
-        return RAGResponse(
+        response = RAGResponse(
             query=query,
             answer=answer,
             sources=retrieval_results,
@@ -113,6 +142,16 @@ class RAGEngine:
                 "num_sources": len(retrieval_results),
             },
         )
+
+        # Cache the result
+        if self.cache:
+            await self.cache.cache_retrieval(
+                query,
+                response.model_dump(),
+                self.config.top_k
+            )
+
+        return response
 
     async def _expand_query(
         self, query: str, context: QueryContext, use_structured_thinking: bool

@@ -76,8 +76,9 @@ all-vector-stores = ["weaviate-client>=4.0.0", "asyncpg>=0.28.0", "elasticsearch
 vision = ["transformers>=4.35.0", "torch>=2.0.0"]
 evaluation = ["ragas>=0.1.0"]
 
-# Observability
+# Observability and Scalability
 observability = ["opik>=0.1.0"]
+scalability = ["redis>=5.0.0", "asyncpg>=0.29.0"]
 
 # Deployment
 deployment = [
