@@ -7,12 +7,10 @@ import json
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from pydantic import BaseModel
-
-from ..rag.types import Document
-from .config import IngestionConfig
+from ragents.ingestion.config import IngestionConfig
+from ragents.rag.types import Document
 
 
 class DocumentProcessor(ABC):
@@ -28,7 +26,9 @@ class DocumentProcessor(ABC):
         """Check if this processor can handle the given file."""
         pass
 
-    async def create_chunks(self, document: Document, config: IngestionConfig) -> List[Dict[str, Any]]:
+    async def create_chunks(
+        self, document: Document, config: IngestionConfig
+    ) -> list[dict[str, Any]]:
         """Create chunks from the document."""
         content = document.content
         chunk_size = config.chunk_size
@@ -42,16 +42,18 @@ class DocumentProcessor(ABC):
             chunk_content = content[start:end]
 
             if chunk_content.strip():  # Only create non-empty chunks
-                chunks.append({
-                    "content": chunk_content,
-                    "metadata": {
-                        **document.metadata,
-                        "chunk_index": len(chunks),
-                        "start_char": start,
-                        "end_char": end,
-                        "chunk_size": len(chunk_content)
+                chunks.append(
+                    {
+                        "content": chunk_content,
+                        "metadata": {
+                            **document.metadata,
+                            "chunk_index": len(chunks),
+                            "start_char": start,
+                            "end_char": end,
+                            "chunk_size": len(chunk_content),
+                        },
                     }
-                })
+                )
 
             start = end - chunk_overlap
 
@@ -67,25 +69,28 @@ class TextProcessor(DocumentProcessor):
     async def process(self, file_path: Path, config: IngestionConfig) -> Document:
         """Process a text file."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except UnicodeDecodeError:
             # Try with different encoding
-            with open(file_path, 'r', encoding='latin-1') as f:
+            with open(file_path, encoding="latin-1") as f:
                 content = f.read()
 
-        from ..rag.types import DocumentType
         import time
+
+        from ragents.rag.types import DocumentType
 
         metadata = {
             "file_type": "text",
             "file_size": file_path.stat().st_size,
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
             "encoding": "utf-8",
-            "line_count": content.count('\n') + 1,
+            "line_count": content.count("\n") + 1,
             "word_count": len(content.split()),
-            "char_count": len(content)
+            "char_count": len(content),
         }
 
         return Document(
@@ -97,7 +102,7 @@ class TextProcessor(DocumentProcessor):
             file_path=str(file_path),
             created_at=time.time(),
             updated_at=time.time(),
-            file_size=file_path.stat().st_size
+            file_size=file_path.stat().st_size,
         )
 
 
@@ -114,8 +119,10 @@ class PDFProcessor(DocumentProcessor):
         except ImportError:
             try:
                 import fitz
-            except ImportError:
-                raise ImportError("PyMuPDF is required for PDF processing. Install with: pip install pymupdf")
+            except ImportError as err:
+                raise ImportError(
+                    "PyMuPDF is required for PDF processing. Install with: pip install pymupdf"
+                ) from err
 
         doc = fitz.open(file_path)
         content_parts = []
@@ -147,12 +154,14 @@ class PDFProcessor(DocumentProcessor):
                         pix = fitz.Pixmap(doc, xref)
                         if pix.n - pix.alpha < 4:  # GRAY or RGB
                             img_data = pix.tobytes("png")
-                            images.append({
-                                "page": page_num + 1,
-                                "index": img_index,
-                                "data": base64.b64encode(img_data).decode(),
-                                "format": "png"
-                            })
+                            images.append(
+                                {
+                                    "page": page_num + 1,
+                                    "index": img_index,
+                                    "data": base64.b64encode(img_data).decode(),
+                                    "format": "png",
+                                }
+                            )
                         pix = None
                     except Exception as e:
                         print(f"Error extracting image: {e}")
@@ -163,11 +172,13 @@ class PDFProcessor(DocumentProcessor):
                     tables_on_page = page.find_tables()
                     for table_index, table in enumerate(tables_on_page):
                         table_data = table.extract()
-                        tables.append({
-                            "page": page_num + 1,
-                            "index": table_index,
-                            "data": table_data
-                        })
+                        tables.append(
+                            {
+                                "page": page_num + 1,
+                                "index": table_index,
+                                "data": table_data,
+                            }
+                        )
                 except Exception as e:
                     print(f"Error extracting table: {e}")
 
@@ -181,15 +192,18 @@ class PDFProcessor(DocumentProcessor):
         if tables:
             metadata["tables"] = tables
 
-        metadata.update({
-            "word_count": len(content.split()),
-            "char_count": len(content),
-            "images_count": len(images),
-            "tables_count": len(tables)
-        })
+        metadata.update(
+            {
+                "word_count": len(content.split()),
+                "char_count": len(content),
+                "images_count": len(images),
+                "tables_count": len(tables),
+            }
+        )
 
-        from ..rag.types import DocumentType
         import time
+
+        from ragents.rag.types import DocumentType
 
         return Document(
             id=str(file_path),
@@ -200,7 +214,7 @@ class PDFProcessor(DocumentProcessor):
             file_path=str(file_path),
             created_at=time.time(),
             updated_at=time.time(),
-            file_size=file_path.stat().st_size
+            file_size=file_path.stat().st_size,
         )
 
 
@@ -214,18 +228,20 @@ class CSVProcessor(DocumentProcessor):
         """Process a CSV file."""
         try:
             import pandas as pd
-        except ImportError:
-            raise ImportError("pandas is required for CSV processing. Install with: pip install pandas")
+        except ImportError as err:
+            raise ImportError(
+                "pandas is required for CSV processing. Install with: pip install pandas"
+            ) from err
 
         try:
             df = pd.read_csv(file_path)
         except Exception as e:
             # Try different encodings
-            for encoding in ['utf-8', 'latin-1', 'cp1252']:
+            for encoding in ["utf-8", "latin-1", "cp1252"]:
                 try:
                     df = pd.read_csv(file_path, encoding=encoding)
                     break
-                except:
+                except Exception:
                     continue
             else:
                 raise e
@@ -250,20 +266,20 @@ class CSVProcessor(DocumentProcessor):
             )
 
         # Add sample data
-        content_parts.extend([
-            "",
-            "Sample Data (first 5 rows):",
-            df.head().to_string(index=False)
-        ])
+        content_parts.extend(
+            ["", "Sample Data (first 5 rows):", df.head().to_string(index=False)]
+        )
 
         # Add summary statistics for numeric columns
-        numeric_cols = df.select_dtypes(include=['number']).columns
+        numeric_cols = df.select_dtypes(include=["number"]).columns
         if len(numeric_cols) > 0:
-            content_parts.extend([
-                "",
-                "Numeric Column Statistics:",
-                df[numeric_cols].describe().to_string()
-            ])
+            content_parts.extend(
+                [
+                    "",
+                    "Numeric Column Statistics:",
+                    df[numeric_cols].describe().to_string(),
+                ]
+            )
 
         content = "\n".join(content_parts)
 
@@ -277,14 +293,13 @@ class CSVProcessor(DocumentProcessor):
             "null_counts": df.isnull().sum().to_dict(),
             "memory_usage": df.memory_usage(deep=True).sum(),
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
         }
 
         return Document(
-            id=str(file_path),
-            content=content,
-            source=str(file_path),
-            metadata=metadata
+            id=str(file_path), content=content, source=str(file_path), metadata=metadata
         )
 
 
@@ -298,13 +313,17 @@ class ParquetProcessor(DocumentProcessor):
         """Process a Parquet file."""
         try:
             import pandas as pd
-        except ImportError:
-            raise ImportError("pandas is required for Parquet processing. Install with: pip install pandas")
+        except ImportError as err:
+            raise ImportError(
+                "pandas is required for Parquet processing. Install with: pip install pandas"
+            ) from err
 
         try:
             import pyarrow.parquet as pq
-        except ImportError:
-            raise ImportError("pyarrow is required for Parquet processing. Install with: pip install pyarrow")
+        except ImportError as err:
+            raise ImportError(
+                "pyarrow is required for Parquet processing. Install with: pip install pyarrow"
+            ) from err
 
         df = pd.read_parquet(file_path)
 
@@ -324,24 +343,24 @@ class ParquetProcessor(DocumentProcessor):
 
         # Add schema details
         schema = parquet_file.schema_arrow
-        for i, field in enumerate(schema):
+        for field in schema:
             content_parts.append(f"- {field.name}: {field.type}")
 
         # Add sample data
-        content_parts.extend([
-            "",
-            "Sample Data (first 5 rows):",
-            df.head().to_string(index=False)
-        ])
+        content_parts.extend(
+            ["", "Sample Data (first 5 rows):", df.head().to_string(index=False)]
+        )
 
         # Add summary statistics
-        numeric_cols = df.select_dtypes(include=['number']).columns
+        numeric_cols = df.select_dtypes(include=["number"]).columns
         if len(numeric_cols) > 0:
-            content_parts.extend([
-                "",
-                "Numeric Column Statistics:",
-                df[numeric_cols].describe().to_string()
-            ])
+            content_parts.extend(
+                [
+                    "",
+                    "Numeric Column Statistics:",
+                    df[numeric_cols].describe().to_string(),
+                ]
+            )
 
         content = "\n".join(content_parts)
 
@@ -357,14 +376,13 @@ class ParquetProcessor(DocumentProcessor):
             "created_by": parquet_metadata.created_by,
             "memory_usage": df.memory_usage(deep=True).sum(),
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
         }
 
         return Document(
-            id=str(file_path),
-            content=content,
-            source=str(file_path),
-            metadata=metadata
+            id=str(file_path), content=content, source=str(file_path), metadata=metadata
         )
 
 
@@ -372,14 +390,24 @@ class ImageProcessor(DocumentProcessor):
     """Processor for image files."""
 
     def can_process(self, file_path: Path) -> bool:
-        return file_path.suffix.lower() in [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"]
+        return file_path.suffix.lower() in [
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".bmp",
+            ".tiff",
+            ".webp",
+        ]
 
     async def process(self, file_path: Path, config: IngestionConfig) -> Document:
         """Process an image file."""
         try:
             from PIL import Image
-        except ImportError:
-            raise ImportError("Pillow is required for image processing. Install with: pip install Pillow")
+        except ImportError as err:
+            raise ImportError(
+                "Pillow is required for image processing. Install with: pip install Pillow"
+            ) from err
 
         # Load image
         with Image.open(file_path) as img:
@@ -389,14 +417,11 @@ class ImageProcessor(DocumentProcessor):
             format_name = img.format
 
             # Convert to RGB if necessary for analysis
-            if mode != 'RGB':
-                img_rgb = img.convert('RGB')
-            else:
-                img_rgb = img
+            img_rgb = img.convert("RGB") if mode != "RGB" else img
 
             # Extract image data
             img_bytes = io.BytesIO()
-            img_rgb.save(img_bytes, format='PNG')
+            img_rgb.save(img_bytes, format="PNG")
             img_base64 = base64.b64encode(img_bytes.getvalue()).decode()
 
         # Create textual description of the image
@@ -413,13 +438,12 @@ class ImageProcessor(DocumentProcessor):
         if config.enable_ocr:
             try:
                 import pytesseract
-                ocr_text = pytesseract.image_to_string(img_rgb, lang=config.ocr_language)
+
+                ocr_text = pytesseract.image_to_string(
+                    img_rgb, lang=config.ocr_language
+                )
                 if ocr_text.strip():
-                    content_parts.extend([
-                        "",
-                        "Extracted Text (OCR):",
-                        ocr_text
-                    ])
+                    content_parts.extend(["", "Extracted Text (OCR):", ocr_text])
             except ImportError:
                 print("pytesseract not available for OCR")
             except Exception as e:
@@ -438,14 +462,13 @@ class ImageProcessor(DocumentProcessor):
             "total_pixels": width * height,
             "image_data": img_base64,
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
         }
 
         return Document(
-            id=str(file_path),
-            content=content,
-            source=str(file_path),
-            metadata=metadata
+            id=str(file_path), content=content, source=str(file_path), metadata=metadata
         )
 
 
@@ -457,7 +480,7 @@ class JSONProcessor(DocumentProcessor):
 
     async def process(self, file_path: Path, config: IngestionConfig) -> Document:
         """Process a JSON file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Create structured content representation
@@ -468,7 +491,7 @@ class JSONProcessor(DocumentProcessor):
             self._analyze_json_structure(data),
             "",
             "Full Content:",
-            json.dumps(data, indent=2, ensure_ascii=False)
+            json.dumps(data, indent=2, ensure_ascii=False),
         ]
 
         content = "\n".join(content_parts)
@@ -480,14 +503,13 @@ class JSONProcessor(DocumentProcessor):
             "key_count": self._count_keys(data),
             "max_depth": self._get_max_depth(data),
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
         }
 
         return Document(
-            id=str(file_path),
-            content=content,
-            source=str(file_path),
-            metadata=metadata
+            id=str(file_path), content=content, source=str(file_path), metadata=metadata
         )
 
     def _analyze_json_structure(self, data: Any, prefix: str = "") -> str:
@@ -505,7 +527,7 @@ class JSONProcessor(DocumentProcessor):
         else:
             return f"{prefix}{type(data).__name__}: {str(data)[:100]}"
 
-    def _get_json_schema(self, data: Any) -> Dict[str, Any]:
+    def _get_json_schema(self, data: Any) -> dict[str, Any]:
         """Get simplified schema of JSON data."""
         if isinstance(data, dict):
             return {key: self._get_json_schema(value) for key, value in data.items()}
@@ -550,8 +572,10 @@ class DocxProcessor(DocumentProcessor):
         """Process a Word document."""
         try:
             from docx import Document as DocxDocument
-        except ImportError:
-            raise ImportError("python-docx is required for DOCX processing. Install with: pip install python-docx")
+        except ImportError as err:
+            raise ImportError(
+                "python-docx is required for DOCX processing. Install with: pip install python-docx"
+            ) from err
 
         doc = DocxDocument(file_path)
 
@@ -571,10 +595,7 @@ class DocxProcessor(DocumentProcessor):
                 for row in table.rows:
                     row_data = [cell.text.strip() for cell in row.cells]
                     table_data.append(row_data)
-                tables_data.append({
-                    "index": table_idx,
-                    "data": table_data
-                })
+                tables_data.append({"index": table_idx, "data": table_data})
 
                 # Add table to content
                 content_parts.append(f"\n--- Table {table_idx + 1} ---")
@@ -599,11 +620,14 @@ class DocxProcessor(DocumentProcessor):
             "modified": props.modified.isoformat() if props.modified else "",
             "tables": tables_data if tables_data else [],
             "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+            "modified_at": datetime.fromtimestamp(
+                file_path.stat().st_mtime
+            ).isoformat(),
         }
 
-        from ..rag.types import DocumentType
         import time
+
+        from ragents.rag.types import DocumentType
 
         return Document(
             id=str(file_path),
@@ -614,7 +638,7 @@ class DocxProcessor(DocumentProcessor):
             file_path=str(file_path),
             created_at=time.time(),
             updated_at=time.time(),
-            file_size=file_path.stat().st_size
+            file_size=file_path.stat().st_size,
         )
 
 
@@ -630,7 +654,7 @@ _PROCESSORS = [
 ]
 
 
-def get_processor_for_file(file_path: Path) -> Optional[DocumentProcessor]:
+def get_processor_for_file(file_path: Path) -> DocumentProcessor | None:
     """Get the appropriate processor for a file."""
     for processor in _PROCESSORS:
         if processor.can_process(file_path):
@@ -638,23 +662,25 @@ def get_processor_for_file(file_path: Path) -> Optional[DocumentProcessor]:
     return None
 
 
-def get_supported_formats() -> List[str]:
+def get_supported_formats() -> list[str]:
     """Get list of all supported file formats."""
-    formats = set()
-    for processor in _PROCESSORS:
-        if hasattr(processor, 'can_process'):
-            # This is a simplified approach - in reality you'd want to
-            # have each processor declare its supported formats
-            pass
-
     return [
-        ".txt", ".md", ".rtf",  # Text
+        ".txt",
+        ".md",
+        ".rtf",  # Text
         ".pdf",  # PDF
         ".csv",  # CSV
         ".parquet",  # Parquet
-        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp",  # Images
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".webp",  # Images
         ".json",  # JSON
-        ".docx", ".doc",  # Word documents
+        ".docx",
+        ".doc",  # Word documents
     ]
 
 
@@ -670,18 +696,17 @@ class MultiModalProcessor:
         """Initialize the multimodal processor."""
         self.config = config
         self.processors = {
-            processor.__class__.__name__: processor
-            for processor in _PROCESSORS
+            processor.__class__.__name__: processor for processor in _PROCESSORS
         }
 
-    async def process_file(self, file_path: Path) -> Optional[Document]:
+    async def process_file(self, file_path: Path) -> Document | None:
         """Process a file using the appropriate processor."""
         processor = get_processor_for_file(file_path)
         if processor:
             return await processor.process(file_path, self.config)
         return None
 
-    async def process_files(self, file_paths: List[Path]) -> List[Document]:
+    async def process_files(self, file_paths: list[Path]) -> list[Document]:
         """Process multiple files concurrently."""
         tasks = [self.process_file(path) for path in file_paths]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -695,7 +720,7 @@ class MultiModalProcessor:
 
         return documents
 
-    def get_supported_formats(self) -> List[str]:
+    def get_supported_formats(self) -> list[str]:
         """Get all supported file formats."""
         return get_supported_formats()
 
@@ -710,10 +735,15 @@ class MultiModalProcessor:
 
         return document
 
-    async def chunk_document(self, document: Document) -> List[Dict[str, Any]]:
+    async def chunk_document(self, document: Document) -> list[dict[str, Any]]:
         """Create chunks from a processed document."""
         if not document.content:
             return []
+
+        import time
+        from uuid import uuid4
+
+        from ragents.rag.types import ChunkType, ContentChunk
 
         content = document.content
         chunk_size = self.config.chunk_size
@@ -721,22 +751,30 @@ class MultiModalProcessor:
 
         chunks = []
         start = 0
+        chunk_index = 0
 
         while start < len(content):
             end = start + chunk_size
             chunk_content = content[start:end]
 
             if chunk_content.strip():  # Only create non-empty chunks
-                chunks.append({
-                    "content": chunk_content,
-                    "metadata": {
+                chunk = ContentChunk(
+                    id=str(uuid4()),
+                    document_id=document.id,
+                    content=chunk_content,
+                    chunk_type=ChunkType.TEXT,
+                    metadata={
                         **document.metadata,
-                        "chunk_index": len(chunks),
+                        "chunk_index": chunk_index,
                         "start_char": start,
                         "end_char": min(end, len(content)),
-                        "document_id": document.document_id,
-                    }
-                })
+                    },
+                    start_index=start,
+                    end_index=min(end, len(content)),
+                    created_at=time.time(),
+                )
+                chunks.append(chunk)
+                chunk_index += 1
 
             start = start + chunk_size - chunk_overlap
             if start >= len(content):

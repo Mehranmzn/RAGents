@@ -2,20 +2,20 @@
 
 import asyncio
 import time
-from typing import Dict, List, Optional
 
-from ..config.rag_config import RAGConfig
-from ..llm.client import LLMClient
-from ..llm.types import ChatMessage, MessageRole, StructuredThought
-from ..ingestion.processors import MultiModalProcessor
-from ..reranking.base import Reranker, RetrievedDocument
-from ..reranking.strategies import HybridReranker, SemanticReranker
-from ..reranking.autocut import AutocutFilter, CutoffStrategy
-from ..reranking.config import RerankingConfig
-from .document_store import DocumentStore
-from .retriever import Retriever
-from .types import Document, QueryContext, RAGResponse
-from .cache import RAGCache, CacheConfig
+from ragents.config.rag_config import RAGConfig
+from ragents.ingestion.config import IngestionConfig
+from ragents.ingestion.processors import MultiModalProcessor
+from ragents.llm.client import LLMClient
+from ragents.llm.types import ChatMessage, MessageRole, StructuredThought
+from ragents.rag.cache import CacheConfig, RAGCache
+from ragents.rag.document_store import DocumentStore
+from ragents.rag.retriever import Retriever
+from ragents.rag.types import Document, QueryContext, RAGResponse
+from ragents.reranking.autocut import AutocutFilter
+from ragents.reranking.base import Reranker, RetrievedDocument
+from ragents.reranking.config import RerankingConfig
+from ragents.reranking.strategies import HybridReranker, SemanticReranker
 
 
 class RAGEngine:
@@ -25,19 +25,29 @@ class RAGEngine:
         self,
         config: RAGConfig,
         llm_client: LLMClient,
-        document_store: Optional[DocumentStore] = None,
-        retriever: Optional[Retriever] = None,
-        processor: Optional[MultiModalProcessor] = None,
-        reranker: Optional[Reranker] = None,
-        autocut_filter: Optional[AutocutFilter] = None,
-        cache: Optional[RAGCache] = None,
-        cache_config: Optional[CacheConfig] = None,
+        document_store: DocumentStore | None = None,
+        retriever: Retriever | None = None,
+        processor: MultiModalProcessor | None = None,
+        reranker: Reranker | None = None,
+        autocut_filter: AutocutFilter | None = None,
+        cache: RAGCache | None = None,
+        cache_config: CacheConfig | None = None,
     ):
         self.config = config
         self.llm_client = llm_client
         self.document_store = document_store or DocumentStore(config)
         self.retriever = retriever or Retriever(config, self.document_store)
-        self.processor = processor or MultiModalProcessor(config)
+
+        # Create IngestionConfig from RAGConfig for the processor
+        ingestion_config = IngestionConfig(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            max_file_size_mb=config.max_file_size_mb,
+            supported_formats=config.supported_formats,
+            extract_tables=config.enable_table_extraction,
+            extract_images=config.enable_vision,
+        )
+        self.processor = processor or MultiModalProcessor(ingestion_config)
 
         # Initialize caching layer
         self.cache = cache
@@ -65,7 +75,7 @@ class RAGEngine:
 
         return document
 
-    async def add_documents_batch(self, file_paths: List[str]) -> List[Document]:
+    async def add_documents_batch(self, file_paths: list[str]) -> list[Document]:
         """Add multiple documents in batch."""
         tasks = [self.add_document(path) for path in file_paths]
         return await asyncio.gather(*tasks)
@@ -75,6 +85,7 @@ class RAGEngine:
         if not self._cache_initialized and self.cache_config:
             if self.cache is None:
                 from .cache import get_cache
+
                 self.cache = await get_cache(self.cache_config)
             elif not self.cache._initialized:
                 await self.cache.initialize()
@@ -83,7 +94,7 @@ class RAGEngine:
     async def query(
         self,
         query: str,
-        context: Optional[QueryContext] = None,
+        context: QueryContext | None = None,
         use_structured_thinking: bool = True,
     ) -> RAGResponse:
         """Query the RAG system with optional structured thinking."""
@@ -128,11 +139,33 @@ class RAGEngine:
 
         processing_time = time.time() - start_time
 
+        # Extract chunks from results - handle both RetrievalResult and RetrievedDocument
+        from .types import ChunkType, ContentChunk
+
+        context_chunks = []
+        for result in retrieval_results:
+            if hasattr(result, "chunk"):
+                # RetrievalResult type
+                context_chunks.append(result.chunk)
+            else:
+                # RetrievedDocument type - create a ContentChunk
+                chunk = ContentChunk(
+                    id=result.document_id or str(hash(result.content)),
+                    document_id=result.document_id or "unknown",
+                    content=result.content,
+                    chunk_type=ChunkType.TEXT,
+                    metadata=result.metadata,
+                    start_index=0,
+                    end_index=len(result.content),
+                    created_at=time.time(),
+                )
+                context_chunks.append(chunk)
+
         response = RAGResponse(
             query=query,
             answer=answer,
             sources=retrieval_results,
-            context_chunks=[result.chunk for result in retrieval_results],
+            context_chunks=context_chunks,
             confidence=confidence,
             reasoning=reasoning,
             processing_time=processing_time,
@@ -146,9 +179,7 @@ class RAGEngine:
         # Cache the result
         if self.cache:
             await self.cache.cache_retrieval(
-                query,
-                response.model_dump(),
-                self.config.top_k
+                query, response.model_dump(), self.config.top_k
             )
 
         return response
@@ -199,22 +230,30 @@ class RAGEngine:
                 expanded = json.loads(response.content)
                 if isinstance(expanded, list):
                     context.expanded_queries.extend(expanded[:3])
-            except:
+            except Exception:
                 pass
 
         return context
 
     async def _generate_answer(
         self, context: QueryContext, retrieval_results, use_structured_thinking: bool
-    ) -> tuple[str, Optional[str]]:
+    ) -> tuple[str, str | None]:
         """Generate answer from retrieved context."""
         # Prepare context from retrieval results
-        context_text = "\n\n".join(
-            [
-                f"Source {i+1} (score: {result.score:.3f}):\n{result.chunk.content}"
-                for i, result in enumerate(retrieval_results[: self.config.top_k])
-            ]
-        )
+        # Handle both RetrievalResult and RetrievedDocument types
+        context_parts = []
+        for i, result in enumerate(retrieval_results[: self.config.top_k]):
+            # Get score - handle both types
+            score = getattr(result, "score", None) or getattr(
+                result, "similarity_score", 0.0
+            )
+            # Get content - handle both types
+            content = getattr(result, "content", None) or (
+                result.chunk.content if hasattr(result, "chunk") else str(result)
+            )
+            context_parts.append(f"Source {i+1} (score: {score:.3f}):\n{content}")
+
+        context_text = "\n\n".join(context_parts)
 
         if use_structured_thinking:
             system_prompt = (
@@ -278,7 +317,7 @@ Answer:"""
         else:
             return HybridReranker()
 
-    async def _apply_reranking_and_autocut(self, query: str, retrieval_results) -> List:
+    async def _apply_reranking_and_autocut(self, query: str, retrieval_results) -> list:
         """Apply reranking and Autocut filtering to retrieval results."""
         if not retrieval_results:
             return retrieval_results
@@ -324,8 +363,34 @@ Answer:"""
             except Exception as e:
                 print(f"Autocut filtering failed: {e}, using all reranked documents")
 
-        # Convert back to original format (simple conversion for compatibility)
-        return reranked_docs[: self.reranking_config.max_documents]
+        # Convert RetrievedDocument back to RetrievalResult for compatibility
+        from .types import ChunkType, ContentChunk, RetrievalResult
+
+        final_results = []
+        for rank, doc in enumerate(
+            reranked_docs[: self.reranking_config.max_documents], 1
+        ):
+            # Create a ContentChunk from the RetrievedDocument
+            chunk = ContentChunk(
+                id=doc.document_id or str(hash(doc.content)),
+                document_id=doc.document_id or "unknown",
+                content=doc.content,
+                chunk_type=ChunkType.TEXT,
+                metadata=doc.metadata,
+                start_index=0,
+                end_index=len(doc.content),
+                created_at=time.time(),
+            )
+            # Create RetrievalResult
+            result = RetrievalResult(
+                chunk=chunk,
+                score=doc.similarity_score,
+                rank=rank,
+                retrieval_method="reranked",
+            )
+            final_results.append(result)
+
+        return final_results
 
     async def _calculate_confidence(
         self, context: QueryContext, retrieval_results, answer: str
@@ -334,21 +399,31 @@ Answer:"""
         if not retrieval_results:
             return 0.0
 
+        # Get scores - handle both RetrievalResult and RetrievedDocument types
+        scores = []
+        for r in retrieval_results:
+            # Try to get score attribute
+            score = getattr(r, "score", None)
+            if score is None:
+                # Try similarity_score attribute
+                score = getattr(r, "similarity_score", None)
+            if score is None:
+                score = 0.0
+            scores.append(float(score))
+
         # Simple confidence calculation based on retrieval scores
-        avg_retrieval_score = sum(r.score for r in retrieval_results) / len(
-            retrieval_results
-        )
+        avg_retrieval_score = sum(scores) / len(scores) if scores else 0.0
 
         # Factor in number of good quality results
-        high_quality_results = sum(1 for r in retrieval_results if r.score > 0.8)
+        high_quality_results = sum(1 for score in scores if score > 0.8)
         coverage_score = min(high_quality_results / 3, 1.0)
 
         # Combine scores
         confidence = (avg_retrieval_score * 0.7) + (coverage_score * 0.3)
 
-        return min(confidence, 1.0)
+        return max(min(confidence, 1.0), 0.0)
 
-    async def get_document_stats(self) -> Dict:
+    async def get_document_stats(self) -> dict:
         """Get statistics about the document collection."""
         return await self.document_store.get_stats()
 
