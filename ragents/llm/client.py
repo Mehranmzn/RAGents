@@ -7,6 +7,10 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 import instructor
 from anthropic import Anthropic, AsyncAnthropic
 from openai import OpenAI, AsyncOpenAI
+try:
+    import google.generativeai as genai
+except ImportError:  # optional dependency
+    genai = None
 from pydantic import BaseModel
 
 from .types import ChatMessage, ModelConfig, ModelProvider, ModelResponse
@@ -45,6 +49,13 @@ class LLMClient:
                 api_key=self.config.api_key,
                 base_url=self.config.base_url,
             )
+        elif self.config.provider == ModelProvider.GEMINI:
+            if genai is None:
+                raise ImportError("google-generativeai package not installed. Install with: pip install google-generativeai")
+            genai.configure(api_key=self.config.api_key)
+            # Gemini models are accessed via GenerativeModel; no distinct async client provided.
+            self._sync_client = genai
+            self._async_client = None
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -85,29 +96,39 @@ class LLMClient:
         **kwargs: Any,
     ) -> Union[ModelResponse, T]:
         """Complete a chat conversation with optional structured output."""
-        api_messages = self._prepare_messages(messages)
         completion_kwargs = {**self._get_completion_kwargs(), **kwargs}
 
+        # Gemini path (no structured output via instructor yet)
+        if self.config.provider == ModelProvider.GEMINI:
+            # Flatten messages into a single prompt with simple role prefixes
+            prompt = "\n".join(f"{m.role.value.upper()}: {m.content}" for m in messages)
+            model = self._sync_client.GenerativeModel(self.config.model_name)
+            gemini_response = model.generate_content(prompt, generation_config={
+                "temperature": self.config.temperature,
+                "top_p": self.config.top_p,
+            })
+            text = "".join(part.text for part in gemini_response.candidates[0].content.parts) if gemini_response.candidates else ""
+            return ModelResponse(content=text, model=self.config.model_name)
+
+        # OpenAI / Anthropic path (existing logic)
+        api_messages = self._prepare_messages(messages)
         if response_model:
-            # Use instructor for structured output
             response = self._instructor_sync.chat.completions.create(
                 messages=api_messages,
                 response_model=response_model,
                 **completion_kwargs,
             )
             return response
-        else:
-            # Standard completion
-            response = self._sync_client.chat.completions.create(
-                messages=api_messages, **completion_kwargs
-            )
-            return ModelResponse(
-                content=response.choices[0].message.content or "",
-                model=response.model,
-                usage=response.usage.model_dump() if response.usage else None,
-                finish_reason=response.choices[0].finish_reason,
-                tool_calls=getattr(response.choices[0].message, "tool_calls", None),
-            )
+        response = self._sync_client.chat.completions.create(
+            messages=api_messages, **completion_kwargs
+        )
+        return ModelResponse(
+            content=response.choices[0].message.content or "",
+            model=response.model,
+            usage=response.usage.model_dump() if response.usage else None,
+            finish_reason=response.choices[0].finish_reason,
+            tool_calls=getattr(response.choices[0].message, "tool_calls", None),
+        )
 
     async def acomplete(
         self,
@@ -116,29 +137,33 @@ class LLMClient:
         **kwargs: Any,
     ) -> Union[ModelResponse, T]:
         """Async completion with optional structured output."""
-        api_messages = self._prepare_messages(messages)
         completion_kwargs = {**self._get_completion_kwargs(), **kwargs}
 
+        # Gemini lacks native async; run in thread if needed
+        if self.config.provider == ModelProvider.GEMINI:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, lambda: self.complete(messages, response_model, **kwargs))
+
+        api_messages = self._prepare_messages(messages)
         if response_model:
-            # Use instructor for structured output
             response = await self._instructor_async.chat.completions.create(
                 messages=api_messages,
                 response_model=response_model,
                 **completion_kwargs,
             )
             return response
-        else:
-            # Standard completion
-            response = await self._async_client.chat.completions.create(
-                messages=api_messages, **completion_kwargs
-            )
-            return ModelResponse(
-                content=response.choices[0].message.content or "",
-                model=response.model,
-                usage=response.usage.model_dump() if response.usage else None,
-                finish_reason=response.choices[0].finish_reason,
-                tool_calls=getattr(response.choices[0].message, "tool_calls", None),
-            )
+
+        response = await self._async_client.chat.completions.create(
+            messages=api_messages, **completion_kwargs
+        )
+        return ModelResponse(
+            content=response.choices[0].message.content or "",
+            model=response.model,
+            usage=response.usage.model_dump() if response.usage else None,
+            finish_reason=response.choices[0].finish_reason,
+            tool_calls=getattr(response.choices[0].message, "tool_calls", None),
+        )
 
     def complete_with_retries(
         self,
