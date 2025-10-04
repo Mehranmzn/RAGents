@@ -339,7 +339,7 @@ RAGents builds upon excellent research and open-source work from the broader AI 
 
 The system is powered by Instructor for type-safe LLM interactions, ensuring robust and reliable language model integration. Observability capabilities are designed to be compatible with OpenInference standards, enabling seamless integration with existing monitoring infrastructure. All external patterns and concepts are implemented independently to respect original licenses while providing enhanced functionality tailored for production environments.
 
-## 🔗 Links
+## 🔗 Links:
 
 - [Documentation](https://ragents.readthedocs.io/en/latest/)
 - [PyPI Package](https://pypi.org/project/ragents) 
