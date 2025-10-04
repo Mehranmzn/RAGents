@@ -10,6 +10,7 @@ class ModelProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     LOCAL = "local"
+    GEMINI = "gemini"
 
 
 class MessageRole(str, Enum):

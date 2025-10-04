@@ -44,6 +44,15 @@ def get_llm_config_from_env(provider: Optional[str] = None) -> ModelConfig:
             if os.environ.get("RAGENTS_MAX_TOKENS")
             else None,
         )
+    elif provider_enum == ModelProvider.GEMINI:
+        return ModelConfig(
+            provider=provider_enum,
+            model_name=os.environ.get("RAGENTS_GEMINI_MODEL", "gemini-1.5-pro"),
+            api_key=os.environ.get("GEMINI_API_KEY"),
+            base_url=os.environ.get("GEMINI_API_BASE_URL"),  # optional override
+            temperature=float(os.environ.get("RAGENTS_TEMPERATURE", "0.7")),
+            max_tokens=int(os.environ.get("RAGENTS_MAX_TOKENS", "2048")) if os.environ.get("RAGENTS_MAX_TOKENS") else None,
+        )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -69,6 +78,7 @@ def get_api_keys_from_env() -> Dict[str, Optional[str]]:
     return {
         "openai": os.environ.get("OPENAI_API_KEY"),
         "anthropic": os.environ.get("ANTHROPIC_API_KEY"),
+        "gemini": os.environ.get("GEMINI_API_KEY"),
         "weaviate": os.environ.get("WEAVIATE_API_KEY"),
         "huggingface": os.environ.get("HUGGINGFACE_API_KEY"),
     }
@@ -82,5 +92,7 @@ def validate_required_env_vars() -> bool:
         raise ValueError("OPENAI_API_KEY environment variable is required")
     elif provider == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
         raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+    elif provider == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        raise ValueError("GEMINI_API_KEY environment variable is required for Gemini provider")
 
     return True
